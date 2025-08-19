@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ER Dashboard - Triage Level</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+  th { background-color: #f2f2f2; }
+</style>
+</head>
+<body>
+
+<h2>ER Dashboard</h2>
+
+<canvas id="erChart" width="800" height="400"></canvas>
+
+<table id="erTable">
+  <thead>
+    <tr>
+      <th>วันที่</th>
+      <th>Resuscitation</th>
+      <th>Emergent</th>
+      <th>Urgent</th>
+      <th>Semi-urgent</th>
+      <th>Non-urgent</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRdUqBjyUj8HoLHDwsmlKO5RjKLR-YWXkSGiqlNpNbN8-fLwFG1Djtd8_l45oT1i7DO8hYLIFQU-fOo/gviz/tq?tqx=out:json';
+
+async function loadSheetData() {
+  const response = await fetch(sheetUrl);
+  const text = await response.text();
+  const json = JSON.parse(text.substring(47).slice(0, -2));
+  const rows = json.table.rows.map(row => ({
+    date: row.c[0]?.v || '',
+    resuscitation: row.c[3]?.v || 0,
+    emergent: row.c[4]?.v || 0,
+    urgent: row.c[5]?.v || 0,
+    semiurgent: row.c[6]?.v || 0,
+    nonurgent: row.c[7]?.v || 0
+  }));
+  return rows;
+}
+
+function updateTable(rows) {
+  const tbody = document.querySelector('#erTable tbody');
+  tbody.innerHTML = '';
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.date}</td>
+      <td>${row.resuscitation}</td>
+      <td>${row.emergent}</td>
+      <td>${row.urgent}</td>
+      <td>${row.semiurgent}</td>
+      <td>${row.nonurgent}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+let chart;
+function updateChart(rows) {
+  const labels = rows.map(r => r.date);
+  const data = {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Resuscitation',
+        data: rows.map(r => r.resuscitation),
+        backgroundColor: 'rgba(220,53,69,0.8)', // แดง
+        borderColor: 'rgba(220,53,69,1)',
+        borderWidth: 1
+      },
+      {
+        label: 'Emergent',
+        data: rows.map(r => r.emergent),
+        backgroundColor: 'rgba(255,165,0,0.8)', // ส้ม
+        borderColor: 'rgba(255,165,0,1)',
+        borderWidth: 1
+      },
+      {
+        label: 'Urgent',
+        data: rows.map(r => r.urgent),
+        backgroundColor: 'rgba(255,206,86,0.8)', // เหลือง
+        borderColor: 'rgba(255,206,86,1)',
+        borderWidth: 1
+      },
+      {
+        label: 'Semi-urgent',
+        data: rows.map(r => r.semiurgent),
+        backgroundColor: 'rgba(75,192,192,0.8)', // เขียว
+        borderColor: 'rgba(75,192,192,1)',
+        borderWidth: 1
+      },
+      {
+        label: 'Non-urgent',
+        data: rows.map(r => r.nonurgent),
+        backgroundColor: 'rgba(54,162,235,0.8)', // ฟ้า
+        borderColor: 'rgba(54,162,235,1)',
+        borderWidth: 1
+      }
+    ]
+  };
+
+  const ctx = document.getElementById('erChart').getContext('2d');
+  if (!chart) {
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: data,
+      options: {
+        responsive: true,
+        scales: {
+          x: { stacked: true, title: { display: true, text: 'วันที่' } },
+          y: { stacked: true, beginAtZero: true, title: { display: true, text: 'จำนวนผู้ป่วย' } }
+        }
+      }
+    });
+  } else {
+    chart.data.labels = labels;
+    chart.data.datasets.forEach((ds, i) => {
+      ds.data = data.datasets[i].data;
+    });
+    chart.update();
+  }
+}
+
+async function refreshDashboard() {
+  const rows = await loadSheetData();
+  updateTable(rows);
+  updateChart(rows);
+}
+
+refreshDashboard();
+setInterval(refreshDashboard, 30000);
+</script>
+
+</body>
+</html>
